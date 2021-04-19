@@ -1,7 +1,8 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow, QInputDialog, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QInputDialog, QFileDialog, QMessageBox, QDesktopWidget
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 import cv2
+import os
 import numpy as np
 import cartoonify
 
@@ -157,10 +158,11 @@ class Ui_Properties(object):
 
         self.btnPreview.clicked.connect(self.btnPreview_clicked)
         self.btnBrowse.clicked.connect(self.btnBrowse_clicked)
+        self.btnSave.clicked.connect(self.btnSave_clicked)
 
     def retranslateUi(self, Properties):
         _translate = QtCore.QCoreApplication.translate
-        Properties.setWindowTitle(_translate("Properties", "MainWindow"))
+        Properties.setWindowTitle(_translate("Properties", "Properties"))
         self.label.setText(_translate("Properties", "Image file : "))
         self.label_2.setText(_translate("Properties", "Edge setting : "))
         self.label_3.setText(_translate("Properties", "Color setting : "))
@@ -182,7 +184,7 @@ class Ui_Properties(object):
 
     def configControlsUi(self):
         self.spinLineSize.lineEdit().setReadOnly(True)
-        self.spinLineSize.setRange(1, 99)
+        self.spinLineSize.setRange(3, 99)
         self.spinLineSize.setSingleStep(2)
         self.spinBlurVal.lineEdit().setReadOnly(True)
         self.spinBlurVal.setRange(1, 99)
@@ -207,23 +209,48 @@ class Ui_Properties(object):
         self.ImgPreviewWindow = QtWidgets.QMainWindow()
         ui = Ui_ImageViewer()
         ui.setupUi(self.ImgPreviewWindow)
-
-        if img is not None:
-            ui.showImage(self.ImgPreviewWindow, img)
+        ui.showImage(self.ImgPreviewWindow, img)
+        ui.actionExit.triggered.connect(lambda:self.ImgPreviewWindow.close())
         self.ImgPreviewWindow.show()
+
+    def saveImg(self, img):
+        if not os.path.exists("./output"):
+            os.mkdir("./output")
+        name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Save as..", "./output/")
+        if name != "":
+            cv2.imwrite(f"{name}.png", img)
+        self.toggleAllControl(True)
 
     def btnPreview_clicked(self):
         self.toggleAllControl(False)
         img = cv2.imread(self.txtImgFile.text())
-        self.worker = CartoonWorker(
-            img, int(self.spinLineSize.value()), int(self.spinBlurVal.value()), int(self.spinKcluster.value()),
-            int(self.slideFilter.value()*2-1), int(self.txtSigma.text())
-        )
-        self.worker.start()
-        self.worker.returnImg.connect(self.worker_finished)
+        if img is not None:
+            self.worker = CartoonWorker(
+                img, int(self.spinLineSize.value()), int(self.spinBlurVal.value()), int(self.spinKcluster.value()),
+                int(self.slideFilter.value()*2-1), int(self.txtSigma.text())
+            )
+            self.worker.start()
+            self.worker.returnImg.connect(self.worker_finished)
+        else:
+            QMessageBox.critical(self.centralwidget, "Error", "Please choose a valid image file.", QMessageBox.Ok)
+            self.toggleAllControl(True)
+
+    def btnSave_clicked(self):
+        self.toggleAllControl(False)
+        img = cv2.imread(self.txtImgFile.text())
+        if img is not None:
+            self.worker = CartoonWorker(
+                img, int(self.spinLineSize.value()), int(self.spinBlurVal.value()), int(self.spinKcluster.value()),
+                int(self.slideFilter.value() * 2 - 1), int(self.txtSigma.text())
+            )
+            self.worker.start()
+            self.worker.returnImg.connect(self.saveImg)
+        else:
+            QMessageBox.critical(self.centralwidget, "Error", "Please choose a valid image file.", QMessageBox.Ok)
+            self.toggleAllControl(True)
 
     def btnBrowse_clicked(self):
-        filedir = QFileDialog.getOpenFileName()
+        filedir = QFileDialog.getOpenFileName(caption="Open", directory="./input",filter="Images (*.png *.xpm *.jpg *.jpeg *.tiff *.gif)")
         self.txtImgFile.setText(filedir[0])
 
 
@@ -238,13 +265,13 @@ class CartoonWorker(QThread):
         self.sigma = sigma
         self.img = img
 
-
     def run(self):
         img2 = cartoonify.edge_mask(self.img, int(self.line), int(self.blur))
         img3 = cartoonify.color_quantization(self.img, self.kcluster)
         img4 = cartoonify.blur_img(img3, self.filter, self.sigma, self.sigma)
         img5 = cartoonify.combine(img2, img4)
         self.returnImg.emit(img5)
+
 
 class Ui_ImageViewer(object):
     def setupUi(self, ImageViewer):
@@ -270,28 +297,33 @@ class Ui_ImageViewer(object):
         self.statusbar = QtWidgets.QStatusBar(ImageViewer)
         self.statusbar.setObjectName("statusbar")
         ImageViewer.setStatusBar(self.statusbar)
-        self.actionSave_as = QtWidgets.QAction(ImageViewer)
-        self.actionSave_as.setObjectName("actionSave_as")
         self.actionExit = QtWidgets.QAction(ImageViewer)
         self.actionExit.setObjectName("actionExit")
+        self.actionExit.setShortcut("Esc")
         self.actionSave = QtWidgets.QAction(ImageViewer)
         self.actionSave.setObjectName("actionSave")
+        self.actionSave.setShortcut("Ctrl+S")
         self.menuFile.addAction(self.actionSave)
-        self.menuFile.addAction(self.actionSave_as)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionExit)
         self.menubar.addAction(self.menuFile.menuAction())
+
+        self.actionSave.triggered.connect(lambda: self.actionSave_clicked())
 
         self.retranslateUi(ImageViewer)
         QtCore.QMetaObject.connectSlotsByName(ImageViewer)
 
     def retranslateUi(self, ImageViewer):
         _translate = QtCore.QCoreApplication.translate
-        ImageViewer.setWindowTitle(_translate("ImageViewer", "MainWindow"))
+        ImageViewer.setWindowTitle(_translate("ImageViewer", "ImageViewer"))
         self.menuFile.setTitle(_translate("ImageViewer", "File"))
-        self.actionSave_as.setText(_translate("ImageViewer", "Save as.."))
         self.actionExit.setText(_translate("ImageViewer", "Exit"))
         self.actionSave.setText(_translate("ImageViewer", "Save"))
+
+        qtRectangle = ImageViewer.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        qtRectangle.moveCenter(centerPoint)
+        ImageViewer.move(qtRectangle.topLeft())
 
 
     def showImage(self, ImageViewer, fileName:str):
@@ -310,6 +342,15 @@ class Ui_ImageViewer(object):
         self.lblPicContainer.setPixmap(QtGui.QPixmap(pixmap))
         self.lblPicContainer.resize(width, height)
         ImageViewer.resize(width, height)
+        ImageViewer.setFixedSize(width, height)
+
+
+    def actionSave_clicked(self):
+        if not os.path.exists("./output"):
+            os.mkdir("./output")
+        name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Save as..", "./output/")
+        if name != "":
+            self.lblPicContainer.pixmap().save(f"{name}.png", format="PNG")
 
 
 if __name__ == "__main__":
@@ -320,8 +361,3 @@ if __name__ == "__main__":
     ui.setupUi(main)
     main.show()
     sys.exit(app.exec_())
-
-
-
-
-# TODO : Save functionality

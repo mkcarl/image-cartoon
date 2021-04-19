@@ -59,12 +59,7 @@ def main(inputFile:str):
     img5 = combine(img2, img4)
     # print("Done calculating")
     show_img(img5)
-
+    cv2.imwrite("test.png", img5)
 
 if __name__ == "__main__":
-    pass
-
-# TODO :
-# add sliders and update button to tweak the values
-# 
-#  
+    main("./input/test.jpeg")
