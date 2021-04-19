@@ -11,6 +11,10 @@ def show_img(img):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+# Save image 
+def save_img(img, filename): 
+    cv2.imwrite(filename, img)
+
 # Find the edge 
 def edge_mask(img, line_size, blur_value):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -46,16 +50,19 @@ def blur_img(img, d, sigmaColor, sigmaSpace):
 def combine(edge, reduced_img): 
     return cv2.bitwise_and(reduced_img, reduced_img, mask=edge)
 
-def main():
-    img = read_img("./input/test.jpeg")
+def main(inputFile:str):
+    # print("Starting ML algorithm")
+    img = read_img(inputFile)
     img2 = edge_mask(img, 9, 9)
     img3 = color_quantization(img, 9)
-    img4 = blur_img(img3, 7, 200, 200)
+    img4 = blur_img(img3, 9, 200, 200)
     img5 = combine(img2, img4)
+    # print("Done calculating")
     show_img(img5)
 
+
 if __name__ == "__main__":
-    main()
+    pass
 
 # TODO :
 # add sliders and update button to tweak the values
